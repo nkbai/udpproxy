@@ -1,0 +1,195 @@
+﻿<HTML>
+ <HEAD>
+     <meta charset="utf-8">
+  <TITLE> JQuery右键菜单 </TITLE>
+  <script  src="jquery.js"></script>
+  <script src="jquery.contextmenu.r2.js"></script>
+ </HEAD>
+
+ <BODY>
+
+
+    <!--右键菜单的源-->
+     <div class="contextMenu" id="myMenu1">
+      <ul>
+        <li id="biterror"> 位错误</li>
+        <li id="loss"> 丢弃</li>
+        <li id="delay">延时20秒</li>      
+        <li id="goon">继续</li>
+      </ul>
+    </div>
+
+<h2  style="text-align:center">显示区域</h2>
+<div id="data"> 
+    <span style="position:absolute;left:100px;" >sender</span>
+    <span style="position:absolute;left:800px;" >receiver</span>
+    <div style="background:blue;height:30px;width:100px;position:absolute;top:50px;left:100px;display:none;text-align:center;font-size:25px;" id="animate"  class="block" >
+        <span></span>
+    </div>
+    
+    </div>
+     <script>
+         (function () {
+             if (typeof (webutil) == "undefined") {//如果不存在这么一个对象，那么就定义了
+                 window.webutil = {
+                     sendPacket: function ( id) {
+                         console.log("sendpacket:" + id);
+                     },
+                     dropPacket:function(id){
+                         console.log("drop packet:" + id);
+                     },
+                     print: function (s) { console.log(s); },
+                 }
+             }
+         })();
+
+     </script>
+     <script> 
+         var initHeight = 100;
+         var maxHeight = 400;
+         var leftNextHeight = initHeight;
+        var leftNextId = 1;
+        var rightNextHeight = initHeight;
+        var rightNextId = 1;
+        var totaltime = 5000;
+        var leftmargin=100;
+        var rightmargin=800;
+        var args = {};
+        var menuobj = {
+            onContextMenu: function (e) {
+                $(e.target).stop();
+                return true;
+            },
+            bindings:
+            {
+                'biterror': function (t) {
+                    //alert(this);
+                    console.log("change " + args[t.id].packetid);
+                    webutil.changeData(args[t.id].packetid);
+                    $("#" + t.id).css("background", "red");
+                    var movefn = args[t.id].movefn;
+                    movefn(caclTime(t.id));
+                },
+                'delay': function (t) {
+                    //alert('Trigger was '+t.id+'\nAction was Email');
+                    $("#" + t.id).delay(2000);
+                    var movefn = args[t.id].movefn;
+                    movefn(caclTime(t.id));
+                    //window.setTimeout(movefn, 2000);
+                },
+                'loss': function (t) {
+                    $("#" + t.id).remove();
+                    webutil.dropPacket(args[t.id].packetid);
+                    delete args[t.id];
+                },
+                'goon': function (t) {
+                    var movefn = args[t.id].movefn;
+                    movefn(caclTime(t.id));
+                }
+            }
+
+        }
+        function caclTime(id) {
+            var node = $("#" + id);
+            var p = node.position();
+            var s="abc";
+            var tlen=rightmargin-leftmargin;
+            var leftlen=0;
+            if (id.indexOf("ack") == 0) {
+                leftlen = p.left - leftmargin;
+            }
+            else {
+                leftlen = rightmargin - p.left;
+            }
+            return leftlen / tlen * totaltime;
+        }
+        function datachange(data, packetid) {
+            console.log("datachange:" + data + ":" + packetid);
+            console.log(JSON.stringify(args));
+            for (n in args) {
+                console.log(args[n].packetid + "," + packetid);
+                if (args[n].packetid == packetid) {
+                    var node = $("#" + args[n].id);
+                    node[0].innerText = data;
+                    
+                }
+            }
+            
+        }
+        function addleft(data, packetid) {
+            var div = $("#data");
+            var node = $("#animate").clone();
+            node[0].innerText =data;
+            var id = "data" + leftNextId;
+            args[id] = {};
+            args[id].id = id;
+            args[id].packetid = packetid;
+            args[id].height = leftNextHeight;
+            node.attr("id", id);
+            node.css("top", leftNextHeight + "px").css("display", "block").css("align", "center");
+            node.css("left", leftmargin + "px");
+            node.contextMenu('myMenu1', menuobj);
+            div.append(node);
+            leftNextHeight += 60;
+            leftNextId++;
+            if (leftNextHeight > maxHeight)
+                leftNextHeight = initHeight;
+            
+            args[id].movefn = function (time) {
+                node.animate({ left: rightmargin+'px' }, time, "linear", function () {
+                    node.css("background", "green");
+                    window.setTimeout(function () {
+                        node.remove();
+                    }, 20000);
+                    webutil.sendPacket(packetid);
+                    delete args[id];
+                });
+            }
+            args[id].movefn(totaltime);
+        }
+        function addright(data, packetid) {
+            var div = $("#data");
+            var node = $("#animate").clone();
+            node.append(data);
+            var id = "ack" + rightNextId;
+            args[id] = {};
+            args[id].id = id;
+            args[id].height = rightNextHeight;
+            args[id].packetid = packetid;
+            node.attr("id", id);
+            node.css("top", rightNextHeight + "px");
+            node.css("left", rightmargin + "px");
+            node.css("display", "block");
+            node.css("background", "yellow");
+            node.contextMenu('myMenu1', menuobj);
+            div.append(node);
+            rightNextHeight += 60;
+            rightNextId++;
+            if (rightNextHeight > maxHeight)
+                rightNextHeight = initHeight;
+            args[id].movefn = function (time) {
+                node.animate({ left: leftmargin+'px' }, time, "linear", function () {
+                    node.css("background", "green");
+                    window.setTimeout(function () {
+                        node.remove();
+                    }, 20000);
+                    webutil.sendPacket(packetid);
+                    delete args[id];
+                });
+            }
+            args[id].movefn(totaltime);
+        }
+         $(document).ready(function(){
+            
+             $("#left").click(function(){
+                 addleft("A", 3);
+             });
+             $("#right").click(function () {
+                 addright(1, 5);
+             });
+         });
+         
+     </script> 
+ </BODY>
+
+</HTML>
